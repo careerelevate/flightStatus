@@ -111,7 +111,7 @@ liveFlightForm.addEventListener("submit", async (event) => {
   try {
     const endpoint = new URL("/flight", apiUrl);
     endpoint.searchParams.set("flight_iata", flightIata);
-    const response = await fetch(endpoint);
+    const response = await fetch(endpoint, { cache: "no-store" });
     const payload = await response.json();
 
     if (!response.ok) {
