@@ -7,6 +7,7 @@ const allowedOrigins = new Set([
 const statusLabels = {
   active: { label: "In flight", className: "in-flight" },
   cancelled: { label: "Cancelled", className: "cancelled" },
+  delayed: { label: "Delayed", className: "delayed" },
   diverted: { label: "Diverted", className: "diverted" },
   incident: { label: "Incident", className: "incident" },
   landed: { label: "Landed", className: "landed" },
@@ -40,6 +41,38 @@ function text(value) {
   return typeof value === "string" && value.trim() ? value.trim() : null;
 }
 
+function numeric(value) {
+  if ((typeof value !== "number" && typeof value !== "string") || value === "") return null;
+
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function mapCoordinates(latitude, longitude) {
+  const lat = numeric(latitude);
+  const lng = numeric(longitude);
+  if (lat === null || lng === null || lat < -90 || lat > 90 || lng < -180 || lng > 180) return null;
+
+  return { latitude: lat, longitude: lng };
+}
+
+function mapPosition(latitude, longitude, altitude, updated) {
+  const coordinates = mapCoordinates(latitude, longitude);
+  const altitudeMeters = numeric(altitude);
+  if (!coordinates && altitudeMeters === null) return null;
+
+  return {
+    ...(coordinates || {}),
+    altitudeMeters,
+    updated: text(updated),
+  };
+}
+
+function delayMinutes(...values) {
+  const delays = values.map(numeric).filter((value) => value !== null);
+  return delays.length ? Math.max(0, ...delays) : null;
+}
+
 function mapAirport(airport) {
   return {
     airport: text(airport?.airport),
@@ -47,14 +80,20 @@ function mapAirport(airport) {
     terminal: text(airport?.terminal),
     gate: text(airport?.gate),
     scheduled: text(airport?.scheduled),
+    estimated: text(airport?.estimated),
+    actual: text(airport?.actual),
     timezone: text(airport?.timezone),
     timezoneLabel: text(airport?.timezoneLabel),
+    latitude: numeric(airport?.latitude),
+    longitude: numeric(airport?.longitude),
   };
 }
 
 function mapFlight(record, requestedFlight) {
   const rawStatus = text(record.flight_status)?.toLowerCase() || "unknown";
-  const status = statusLabels[rawStatus] || { label: "Status unavailable", className: "unknown" };
+  const reportedDelay = delayMinutes(record.departure?.delay, record.arrival?.delay);
+  const normalizedStatus = rawStatus === "scheduled" && reportedDelay > 0 ? "delayed" : rawStatus;
+  const status = statusLabels[normalizedStatus] || { label: "Status unavailable", className: "unknown" };
 
   return {
     flightDate: text(record.flight_date),
@@ -62,6 +101,13 @@ function mapFlight(record, requestedFlight) {
     airline: text(record.airline?.name),
     status: status.label,
     statusClass: status.className,
+    delayMinutes: reportedDelay,
+    position: mapPosition(
+      record.live?.latitude,
+      record.live?.longitude,
+      record.live?.altitude,
+      record.live?.updated,
+    ),
     departure: mapAirport(record.departure),
     arrival: mapAirport(record.arrival),
   };
@@ -99,12 +145,21 @@ function formatAirlabsTime(value) {
 
 function mapAirlabsFlight(record, requestedFlight) {
   const rawStatus = text(record.status)?.toLowerCase() || "unknown";
+  const reportedDelay = delayMinutes(record.dep_delayed, record.arr_delayed, record.delayed);
   const normalizedStatus = rawStatus === "en-route"
     ? "active"
     : rawStatus === "on-ground"
       ? "landed"
+      : rawStatus === "scheduled" && reportedDelay > 0
+        ? "delayed"
       : rawStatus;
   const status = statusLabels[normalizedStatus] || { label: "Status unavailable", className: "unknown" };
+  const departureScheduled = formatAirlabsTime(firstText(record.dep_time_utc, record.dep_time));
+  const departureEstimated = formatAirlabsTime(firstText(record.dep_estimated_utc, record.dep_estimated));
+  const departureActual = formatAirlabsTime(firstText(record.dep_actual_utc, record.dep_actual));
+  const arrivalScheduled = formatAirlabsTime(firstText(record.arr_time_utc, record.arr_time));
+  const arrivalEstimated = formatAirlabsTime(firstText(record.arr_estimated_utc, record.arr_estimated));
+  const arrivalActual = formatAirlabsTime(firstText(record.arr_actual_utc, record.arr_actual));
   const departureUtc = firstText(record.dep_actual_utc, record.dep_estimated_utc, record.dep_time_utc);
   const arrivalUtc = firstText(record.arr_actual_utc, record.arr_estimated_utc, record.arr_time_utc);
   const departureTime = formatAirlabsTime(
@@ -120,14 +175,20 @@ function mapAirlabsFlight(record, requestedFlight) {
     airline: text(record.airline_name),
     status: status.label,
     statusClass: status.className,
+    delayMinutes: reportedDelay,
+    position: mapPosition(record.lat, record.lng, record.alt, record.updated),
     departure: mapAirport({
       airport: firstText(record.dep_name, record.dep_iata),
       iata: record.dep_iata,
       terminal: record.dep_terminal,
       gate: record.dep_gate,
       scheduled: departureTime,
+      estimated: departureEstimated,
+      actual: departureActual,
       timezone: departureUtc ? "UTC" : null,
       timezoneLabel: departureUtc ? "UTC" : "Airport local",
+      latitude: record.dep_lat,
+      longitude: record.dep_lng,
     }),
     arrival: mapAirport({
       airport: firstText(record.arr_name, record.arr_iata),
@@ -135,8 +196,12 @@ function mapAirlabsFlight(record, requestedFlight) {
       terminal: record.arr_terminal,
       gate: record.arr_gate,
       scheduled: arrivalTime,
+      estimated: arrivalEstimated,
+      actual: arrivalActual,
       timezone: arrivalUtc ? "UTC" : null,
       timezoneLabel: arrivalUtc ? "UTC" : "Airport local",
+      latitude: record.arr_lat,
+      longitude: record.arr_lng,
     }),
   };
 }
@@ -148,11 +213,163 @@ function findAirlabsFlight(payload, requestedFlight) {
   return records.find((record) => normalizeFlightIata(record?.flight_iata) === requestedFlight);
 }
 
+async function getAirportCoordinates(env, airportIata) {
+  const code = text(airportIata)?.toUpperCase();
+  if (!code || !/^[A-Z]{3}$/.test(code)) return null;
+
+  const cacheKey = `airport:v1:${code}`;
+  if (env.FLIGHT_CACHE) {
+    try {
+      const cached = await env.FLIGHT_CACHE.get(cacheKey, { type: "json" });
+      const coordinates = mapCoordinates(cached?.latitude, cached?.longitude);
+      if (coordinates) return coordinates;
+    } catch (error) {
+      console.error(`Airport coordinate cache read failed for ${code}.`, error);
+    }
+  }
+
+  if (!env.AIRLABS_API_KEY) return null;
+
+  const apiUrl = new URL("https://airlabs.co/api/v9/airports");
+  apiUrl.searchParams.set("iata_code", code);
+  apiUrl.searchParams.set("api_key", env.AIRLABS_API_KEY);
+
+  let apiResponse;
+  try {
+    apiResponse = await fetch(apiUrl);
+  } catch (error) {
+    console.error(`Airport coordinate lookup failed for ${code}.`, error);
+    return null;
+  }
+
+  let payload;
+  try {
+    payload = await apiResponse.json();
+  } catch (error) {
+    console.error(`Airport coordinate response was invalid for ${code}.`, error);
+    return null;
+  }
+
+  if (!apiResponse.ok || payload.error) {
+    console.error(`Airport coordinates were unavailable for ${code}.`);
+    return null;
+  }
+
+  const data = payload?.response ?? payload?.data ?? payload;
+  const records = Array.isArray(data) ? data : [data];
+  const airport = records.find((record) => text(record?.iata_code)?.toUpperCase() === code);
+  const coordinates = mapCoordinates(airport?.lat, airport?.lng);
+  if (!coordinates) return null;
+
+  if (env.FLIGHT_CACHE) {
+    try {
+      await env.FLIGHT_CACHE.put(cacheKey, JSON.stringify(coordinates), { expirationTtl: 2_592_000 });
+    } catch (error) {
+      console.error(`Airport coordinates could not be saved for ${code}.`, error);
+    }
+  }
+
+  return coordinates;
+}
+
+function radians(degrees) {
+  return degrees * Math.PI / 180;
+}
+
+function distanceInKm(from, to) {
+  const latitudeDelta = radians(to.latitude - from.latitude);
+  const longitudeDelta = radians(to.longitude - from.longitude);
+  const fromLatitude = radians(from.latitude);
+  const toLatitude = radians(to.latitude);
+  const haversine = Math.sin(latitudeDelta / 2) ** 2
+    + Math.cos(fromLatitude) * Math.cos(toLatitude) * Math.sin(longitudeDelta / 2) ** 2;
+  const clampedHaversine = Math.min(1, Math.max(0, haversine));
+
+  return 6371.0088 * 2 * Math.atan2(
+    Math.sqrt(clampedHaversine),
+    Math.sqrt(1 - clampedHaversine),
+  );
+}
+
+function initialBearing(from, to) {
+  const fromLatitude = radians(from.latitude);
+  const toLatitude = radians(to.latitude);
+  const longitudeDelta = radians(to.longitude - from.longitude);
+
+  return Math.atan2(
+    Math.sin(longitudeDelta) * Math.cos(toLatitude),
+    Math.cos(fromLatitude) * Math.sin(toLatitude)
+      - Math.sin(fromLatitude) * Math.cos(toLatitude) * Math.cos(longitudeDelta),
+  );
+}
+
+function calculateRouteProgress(departure, arrival, position) {
+  if (!position || position.latitude === undefined || position.longitude === undefined) return null;
+
+  const totalDistance = distanceInKm(departure, arrival);
+  if (totalDistance < 1) return null;
+
+  const earthRadius = 6371.0088;
+  const currentDistance = distanceInKm(departure, position);
+  const bearingDifference = initialBearing(departure, position) - initialBearing(departure, arrival);
+  const alongTrackDistance = Math.atan2(
+    Math.sin(currentDistance / earthRadius) * Math.cos(bearingDifference),
+    Math.cos(currentDistance / earthRadius),
+  ) * earthRadius;
+  const distanceCovered = Math.min(totalDistance, Math.max(0, alongTrackDistance));
+  const altitudeMeters = numeric(position.altitudeMeters);
+
+  return {
+    percentage: Math.round(distanceCovered / totalDistance * 100),
+    distanceCoveredMiles: Math.round(distanceCovered * 0.621371),
+    distanceRemainingMiles: Math.round((totalDistance - distanceCovered) * 0.621371),
+    altitudeFeet: altitudeMeters === null ? null : Math.round(altitudeMeters * 3.28084),
+  };
+}
+
+async function addRouteProgress(flight, env) {
+  if (flight.statusClass === "landed") {
+    const altitudeMeters = numeric(flight.position?.altitudeMeters);
+    flight.progress = {
+      percentage: 100,
+      distanceCoveredMiles: null,
+      distanceRemainingMiles: 0,
+      altitudeFeet: altitudeMeters === null ? null : Math.round(altitudeMeters * 3.28084),
+    };
+    return;
+  }
+
+  if (flight.statusClass !== "in-flight") return;
+
+  if (flight.position?.latitude === undefined || flight.position?.longitude === undefined) {
+    flight.progressMessage = "The provider did not return a live aircraft position.";
+    return;
+  }
+
+  const [departure, arrival] = await Promise.all([
+    mapCoordinates(flight.departure.latitude, flight.departure.longitude)
+      || getAirportCoordinates(env, flight.departure.iata),
+    mapCoordinates(flight.arrival.latitude, flight.arrival.longitude)
+      || getAirportCoordinates(env, flight.arrival.iata),
+  ]);
+  if (!departure || !arrival) {
+    flight.progressMessage = env.AIRLABS_API_KEY
+      ? "Airport coordinates are unavailable, so route progress cannot be calculated."
+      : "Set AIRLABS_API_KEY to look up airport coordinates for route progress.";
+    return;
+  }
+
+  flight.progress = calculateRouteProgress(departure, arrival, flight.position);
+  if (!flight.progress) {
+    flight.progressMessage = "Route progress could not be calculated from the available coordinates.";
+  }
+}
+
 async function getCachedFlight(env, flightIata, origin) {
   if (!env.FLIGHT_CACHE) return null;
 
   try {
-    const cached = await env.FLIGHT_CACHE.get(`flight:v1:${flightIata}`, { type: "json" });
+    const cached = await env.FLIGHT_CACHE.get(`flight:v2:${flightIata}`, { type: "json" });
     if (!cached) return null;
     if (!cached.flight) {
       console.error("Stored flight lookup data is invalid.");
@@ -171,11 +388,13 @@ async function getCachedFlight(env, flightIata, origin) {
 }
 
 async function responseWithSavedFlight(flight, source, env, flightIata, origin) {
+  await addRouteProgress(flight, env);
+
   let cacheStored = false;
   if (env.FLIGHT_CACHE) {
     try {
       await env.FLIGHT_CACHE.put(
-        `flight:v1:${flightIata}`,
+        `flight:v2:${flightIata}`,
         JSON.stringify({ flight }),
         { expirationTtl: 300 },
       );

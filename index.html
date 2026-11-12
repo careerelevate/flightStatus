@@ -6,9 +6,9 @@
     <meta name="theme-color" content="#101a30">
     <meta name="description" content="A clear, easy-to-use flight status board.">
     <title>Flight Status — Live Board</title>
-    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="styles.css?v=3">
     <script src="api-config.js"></script>
-    <script src="script.js?v=3" defer></script>
+    <script src="script.js?v=5" defer></script>
   </head>
   <body>
     <header class="topbar">
@@ -48,6 +48,41 @@
         </form>
         <p class="lookup-message" id="lookup-message" role="status" aria-live="polite">Enter a flight number above to check its status.</p>
         <article class="live-result" id="live-result" aria-live="polite" hidden></article>
+        <section class="flight-visual" id="flight-visual" aria-label="Flight path" hidden>
+          <div class="flight-visual-grid">
+            <div class="flight-path">
+              <div class="runway-heading">
+                <div>
+                  <p class="eyebrow">FLIGHT PATH</p>
+                  <p class="runway-caption" id="runway-caption"></p>
+                </div>
+                <span class="runway-state" id="runway-state"></span>
+              </div>
+              <div class="runway-track" id="runway-track" role="img">
+                <div class="runway-fill" id="runway-fill"></div>
+                <div class="runway-centerline" aria-hidden="true"></div>
+                <span class="runway-plane" id="runway-plane" aria-hidden="true">✈</span>
+                <span class="runway-cancelled" id="runway-cancelled" aria-hidden="true" hidden>×</span>
+              </div>
+              <div class="runway-endpoints">
+                <span id="runway-origin"></span>
+                <span id="runway-destination"></span>
+              </div>
+              <p class="runway-metrics" id="runway-metrics"></p>
+              <p class="runway-note" id="runway-note" hidden></p>
+              <p class="runway-legend">Green: on time · Yellow: 1–30 min late · Red: 31–120 min late · Purple: over 2 hours late</p>
+            </div>
+            <aside class="arrival-summary" aria-label="Arrival estimate">
+              <p class="eyebrow">ARRIVAL SUMMARY</p>
+              <span class="arrival-plane" aria-hidden="true">✈</span>
+              <span class="arrival-label">TIME TO ARRIVAL</span>
+              <strong class="arrival-countdown" id="arrival-countdown">Not available</strong>
+              <span class="arrival-time" id="arrival-time"></span>
+              <span class="arrival-label arrival-delay-label">DELAY</span>
+              <strong class="arrival-delay" id="arrival-delay">Not available</strong>
+            </aside>
+          </div>
+        </section>
       </section>
     </main>
 

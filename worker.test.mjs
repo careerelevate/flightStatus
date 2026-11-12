@@ -36,7 +36,7 @@ test("serves saved flight details from KV without calling a flight provider", as
     const payload = await response.json();
 
     assert.equal(response.status, 200);
-    assert.deepEqual(requestedKey, ["flight:v1:AA100", { type: "json" }]);
+    assert.deepEqual(requestedKey, ["flight:v2:AA100", { type: "json" }]);
     assert.equal(payload.source, "database");
     assert.equal(payload.cacheStored, true);
     assert.equal(payload.flight.flightNumber, "AA100");
@@ -89,6 +89,8 @@ test("maps Aviationstack flight data and allows the published site origin", asyn
           airport: "Los Angeles International",
           iata: "LAX",
           scheduled: "2026-11-11T21:15:00-08:00",
+          estimated: "2026-11-11T21:45:00-08:00",
+          actual: null,
           timezone: "America/Los_Angeles",
         },
       }],
@@ -105,7 +107,7 @@ test("maps Aviationstack flight data and allows the published site origin", asyn
         FLIGHT_CACHE: {
           get: async () => null,
           put: async (key, value, options) => {
-            assert.equal(key, "flight:v1:AA100");
+            assert.equal(key, "flight:v2:AA100");
             storedValue = JSON.parse(value);
             storedOptions = options;
           },
@@ -122,10 +124,151 @@ test("maps Aviationstack flight data and allows the published site origin", asyn
     assert.equal(payload.flight.status, "In flight");
     assert.equal(payload.flight.departure.iata, "JFK");
     assert.equal(payload.flight.arrival.iata, "LAX");
+    assert.equal(payload.flight.arrival.estimated, "2026-11-11T21:45:00-08:00");
+    assert.equal(payload.flight.arrival.actual, null);
     assert.equal(payload.source, "Aviationstack");
     assert.equal(payload.cacheStored, true);
     assert.equal(storedValue.flight.flightNumber, "AA100");
     assert.deepEqual(storedOptions, { expirationTtl: 300 });
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("maps delay and calculates route progress for an airborne flight", async () => {
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async () => new Response(JSON.stringify({
+    data: [{
+      flight_status: "active",
+      flight: { iata: "AA100" },
+      departure: { iata: "AAA", latitude: 0, longitude: 0, delay: 0 },
+      arrival: { iata: "BBB", latitude: 0, longitude: 10 },
+      live: { latitude: 0, longitude: 5, altitude: 10000 },
+    }],
+  }), { status: 200 });
+
+  try {
+    const response = await worker.fetch(
+      new Request("https://flightstatus-api.example.workers.dev/flight?flight_iata=AA100"),
+      { AVIATIONSTACK_API_KEY: "test-key" },
+    );
+    const payload = await response.json();
+
+    assert.equal(response.status, 200);
+    assert.equal(payload.flight.delayMinutes, 0);
+    assert.equal(payload.flight.progress.percentage, 50);
+    assert.equal(payload.flight.progress.distanceCoveredMiles, 345);
+    assert.equal(payload.flight.progress.distanceRemainingMiles, 345);
+    assert.equal(payload.flight.progress.altitudeFeet, 32808);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("looks up and caches airport coordinates when a flight omits them", async () => {
+  const originalFetch = globalThis.fetch;
+  const requestedUrls = [];
+  const storedEntries = [];
+  globalThis.fetch = async (input) => {
+    const url = new URL(input);
+    requestedUrls.push(url);
+
+    if (url.hostname === "api.aviationstack.com") {
+      return new Response(JSON.stringify({
+        data: [{
+          flight_status: "active",
+          flight: { iata: "AA100" },
+          departure: { iata: "JFK" },
+          arrival: { iata: "LAX" },
+          live: { latitude: 39, longitude: -98 },
+        }],
+      }), { status: 200 });
+    }
+
+    const airportCoordinates = {
+      JFK: { lat: 40.6413, lng: -73.7781 },
+      LAX: { lat: 33.9416, lng: -118.4085 },
+    };
+    const code = url.searchParams.get("iata_code");
+    return new Response(JSON.stringify({
+      response: [{ iata_code: code, ...airportCoordinates[code] }],
+    }), { status: 200 });
+  };
+
+  try {
+    const response = await worker.fetch(
+      new Request("https://flightstatus-api.example.workers.dev/flight?flight_iata=AA100"),
+      {
+        AVIATIONSTACK_API_KEY: "test-key",
+        AIRLABS_API_KEY: "airlabs-key",
+        FLIGHT_CACHE: {
+          get: async () => null,
+          put: async (key, value, options) => storedEntries.push({
+            key,
+            value: JSON.parse(value),
+            options,
+          }),
+        },
+      },
+    );
+    const payload = await response.json();
+
+    assert.equal(response.status, 200);
+    assert.equal(requestedUrls.length, 3);
+    assert.deepEqual(
+      requestedUrls.slice(1).map((url) => url.searchParams.get("iata_code")).sort(),
+      ["JFK", "LAX"],
+    );
+    assert.ok(payload.flight.progress.percentage > 0);
+    assert.ok(payload.flight.progress.percentage < 100);
+    assert.deepEqual(
+      storedEntries.filter((entry) => entry.key.startsWith("airport:v1:"))
+        .map((entry) => entry.options.expirationTtl)
+        .sort(),
+      [2_592_000, 2_592_000],
+    );
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("reports missing aircraft position and handles landed or cancelled flights", async () => {
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async (input) => {
+    const flightIata = new URL(input).searchParams.get("flight_iata");
+    const status = {
+      AA100: "active",
+      AA101: "landed",
+      AA102: "cancelled",
+    }[flightIata];
+    return new Response(JSON.stringify({
+      data: [{
+        flight_status: status,
+        flight: { iata: flightIata },
+        departure: { iata: "JFK" },
+        arrival: { iata: "LAX" },
+      }],
+    }), { status: 200 });
+  };
+
+  try {
+    const lookup = (flightIata) => worker.fetch(
+      new Request(`https://flightstatus-api.example.workers.dev/flight?flight_iata=${flightIata}`),
+      { AVIATIONSTACK_API_KEY: "test-key" },
+    );
+    const activeResponse = await lookup("AA100");
+    const landedResponse = await lookup("AA101");
+    const cancelledResponse = await lookup("AA102");
+    const active = await activeResponse.json();
+    const landed = await landedResponse.json();
+    const cancelled = await cancelledResponse.json();
+
+    assert.equal(active.flight.progress, undefined);
+    assert.match(active.flight.progressMessage, /did not return a live aircraft position/i);
+    assert.equal(landed.flight.progress.percentage, 100);
+    assert.equal(cancelled.flight.status, "Cancelled");
+    assert.equal(cancelled.flight.statusClass, "cancelled");
+    assert.equal(cancelled.flight.progress, undefined);
   } finally {
     globalThis.fetch = originalFetch;
   }
@@ -214,6 +357,7 @@ test("uses AirLabs when Aviationstack reports its request limit was reached", as
         arr_iata: "LAX",
         arr_name: "Los Angeles International",
         arr_time_utc: "2026-11-12 21:15",
+        arr_estimated_utc: "2026-11-12 21:45",
       },
     }), { status: 200 });
   };
@@ -227,7 +371,7 @@ test("uses AirLabs when Aviationstack reports its request limit was reached", as
         FLIGHT_CACHE: {
           get: async () => null,
           put: async (key, value) => {
-            assert.equal(key, "flight:v1:AA100");
+            assert.equal(key, "flight:v2:AA100");
             storedFlight = JSON.parse(value).flight;
           },
         },
@@ -248,6 +392,7 @@ test("uses AirLabs when Aviationstack reports its request limit was reached", as
     assert.equal(payload.flight.departure.scheduled, "2026-11-12T18:00:00Z");
     assert.equal(payload.flight.departure.timezoneLabel, "UTC");
     assert.equal(payload.flight.arrival.iata, "LAX");
+    assert.equal(payload.flight.arrival.estimated, "2026-11-12T21:45:00Z");
     assert.equal(payload.source, "AirLabs");
     assert.equal(payload.cacheStored, true);
     assert.equal(storedFlight.flightNumber, "AA100");

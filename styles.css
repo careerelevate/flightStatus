@@ -282,6 +282,16 @@ h1 {
   color: var(--orange);
 }
 
+.live-status--cancelled {
+  background: #fee2e2;
+  color: #b42318;
+}
+
+.live-status--delayed {
+  background: #fff6cf;
+  color: #8a6400;
+}
+
 .live-status--unknown {
   background: #edf1f7;
   color: #66748a;
@@ -310,6 +320,248 @@ h1 {
   font-weight: 600;
   line-height: 1.5;
   overflow-wrap: anywhere;
+}
+
+.flight-visual {
+  margin-top: 16px;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: #fbfcfe;
+}
+
+.flight-visual-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 190px;
+  gap: 16px;
+}
+
+.flight-path {
+  min-width: 0;
+}
+
+.arrival-summary {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: white;
+}
+
+.arrival-summary .eyebrow {
+  margin-bottom: 12px;
+  font-size: 9px;
+}
+
+.arrival-plane {
+  display: grid;
+  width: 30px;
+  height: 30px;
+  margin-bottom: 12px;
+  place-items: center;
+  border-radius: 8px;
+  background: #eaf0ff;
+  color: var(--blue);
+  font-size: 18px;
+}
+
+.arrival-label {
+  color: #8792a4;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.7px;
+}
+
+.arrival-countdown,
+.arrival-delay {
+  margin-top: 5px;
+  color: #29364d;
+  font-family: "Manrope", sans-serif;
+  font-size: 17px;
+  line-height: 1.3;
+}
+
+.arrival-time {
+  margin-top: 5px;
+  color: #69758b;
+  font-size: 10px;
+  line-height: 1.5;
+}
+
+.arrival-delay-label {
+  margin-top: 16px;
+}
+
+.arrival-delay {
+  font-size: 12px;
+}
+
+.runway-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.runway-heading .eyebrow {
+  margin-bottom: 4px;
+  font-size: 9px;
+}
+
+.runway-caption {
+  margin: 0;
+  color: #29364d;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.runway-state {
+  padding: 6px 9px;
+  border-radius: 20px;
+  font-size: 10px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.runway-state--green {
+  background: #e9f7f1;
+  color: #167348;
+}
+
+.runway-state--yellow {
+  background: #fff6cf;
+  color: #8a6400;
+}
+
+.runway-state--red,
+.runway-state--cancelled {
+  background: #fee2e2;
+  color: #b42318;
+}
+
+.runway-state--purple {
+  background: #f3edff;
+  color: #6332a8;
+}
+
+.runway-state--neutral {
+  background: #edf1f7;
+  color: #66748a;
+}
+
+.runway-track {
+  --runway-accent: #16835d;
+  --runway-surface: #e5f4ec;
+  position: relative;
+  height: 54px;
+  margin: 15px 0 7px;
+  overflow: hidden;
+  border: 1px solid var(--runway-accent);
+  border-radius: 10px;
+  background: var(--runway-surface);
+}
+
+.runway-track--yellow {
+  --runway-accent: #bd8a00;
+  --runway-surface: #fff6cf;
+}
+
+.runway-track--red {
+  --runway-accent: #c53535;
+  --runway-surface: #fee2e2;
+}
+
+.runway-track--purple {
+  --runway-accent: #7043b5;
+  --runway-surface: #f0e8ff;
+}
+
+.runway-track--neutral {
+  --runway-accent: #66748a;
+  --runway-surface: #edf1f7;
+}
+
+.runway-track--cancelled {
+  --runway-accent: #b42318;
+  --runway-surface: #fef2f2;
+  background: repeating-linear-gradient(135deg, #fef2f2 0 12px, #fee2e2 12px 24px);
+}
+
+.runway-fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 0;
+  background: var(--runway-accent);
+  opacity: 0.24;
+  transition: width 500ms ease;
+}
+
+.runway-centerline {
+  position: absolute;
+  z-index: 1;
+  top: 50%;
+  right: 14px;
+  left: 14px;
+  border-top: 2px dashed rgb(255 255 255 / 95%);
+  transform: translateY(-50%);
+}
+
+.runway-plane {
+  position: absolute;
+  z-index: 2;
+  top: 50%;
+  left: clamp(14px, var(--progress, 0%), calc(100% - 14px));
+  color: var(--runway-accent);
+  font-size: 24px;
+  line-height: 1;
+  text-shadow: 0 1px 2px rgb(16 26 48 / 18%);
+  transform: translate(-50%, -50%) rotate(90deg);
+  transition: left 500ms ease;
+}
+
+.runway-cancelled {
+  position: absolute;
+  z-index: 2;
+  top: 50%;
+  left: 50%;
+  color: #b42318;
+  font-size: 36px;
+  font-weight: 700;
+  line-height: 1;
+  transform: translate(-50%, -55%);
+}
+
+.runway-endpoints {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  color: #69758b;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.runway-endpoints span:last-child {
+  text-align: right;
+}
+
+.runway-metrics,
+.runway-note,
+.runway-legend {
+  margin: 10px 0 0;
+  color: #69758b;
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.runway-note {
+  color: #8a6400;
+}
+
+.runway-legend {
+  color: #8994a6;
+  font-size: 9px;
 }
 
 h2 {
@@ -349,6 +601,14 @@ footer {
 
   .live-lookup {
     padding: 22px 18px 17px;
+  }
+
+  .flight-visual {
+    padding: 13px;
+  }
+
+  .flight-visual-grid {
+    grid-template-columns: minmax(0, 1fr);
   }
 }
 

@@ -24,6 +24,10 @@ The GitHub Pages site provides flight-number lookups through a Cloudflare Worker
 
 The Worker accepts flight-number lookups and restricts browser access to the site. It checks KV before either provider, stores successful responses for five minutes, and then refreshes expired or missing entries. This keeps live status from remaining stale for long. Workers KV is available on Cloudflare's Free plan; its current limits are listed in the [KV pricing documentation](https://developers.cloudflare.com/kv/platform/pricing/). AirLabs results label times as UTC or airport-local, depending on the fields provided.
 
+## Flight path display
+
+The page colors the route green when no delay is reported, yellow for 1–30 minutes, red for 31–120 minutes, and purple for more than 120 minutes. Cancellations are marked with a red `CANCELLED` label and symbol. The small aircraft marker stays at the origin before departure, follows calculated progress while airborne, moves to the destination after landing, and is replaced by a cancellation symbol when the flight is cancelled. A side panel shows the time remaining to the estimated arrival (or scheduled arrival adjusted by a reported delay), the arrival time, and the reported delay in minutes. For airborne flights, the Worker calculates approximate great-circle route progress from the aircraft's latitude/longitude and both airports' coordinates; altitude is shown separately. Airport coordinates are looked up through AirLabs when the flight provider does not include them and are cached in KV for 30 days. Set `AIRLABS_API_KEY` to enable that lookup. If the aircraft position or airport coordinates are missing, the page says that progress is unavailable instead of guessing.
+
 ## Test
 
 Run the Worker tests with Node.js:
