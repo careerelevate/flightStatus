@@ -367,6 +367,18 @@ h1 {
   font-size: 18px;
 }
 
+.aircraft-icon {
+  display: block;
+  width: 1em;
+  height: 1em;
+}
+
+.arrival-plane .aircraft-icon {
+  width: 20px;
+  height: 20px;
+  transform: rotate(35deg);
+}
+
 .arrival-label {
   color: #8792a4;
   font-size: 9px;
@@ -519,6 +531,11 @@ h1 {
   text-shadow: 0 1px 2px rgb(16 26 48 / 18%);
   transform: translate(-50%, -50%) rotate(90deg);
   transition: left 500ms ease;
+}
+
+.runway-plane .aircraft-icon {
+  width: 24px;
+  height: 24px;
 }
 
 .runway-cancelled {

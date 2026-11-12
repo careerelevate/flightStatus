@@ -6,7 +6,7 @@
     <meta name="theme-color" content="#101a30">
     <meta name="description" content="A clear, easy-to-use flight status board.">
     <title>Flight Status — Live Board</title>
-    <link rel="stylesheet" href="styles.css?v=3">
+    <link rel="stylesheet" href="styles.css?v=4">
     <script src="api-config.js"></script>
     <script src="script.js?v=5" defer></script>
   </head>
@@ -61,7 +61,11 @@
               <div class="runway-track" id="runway-track" role="img">
                 <div class="runway-fill" id="runway-fill"></div>
                 <div class="runway-centerline" aria-hidden="true"></div>
-                <span class="runway-plane" id="runway-plane" aria-hidden="true">✈</span>
+                <span class="runway-plane" id="runway-plane" aria-hidden="true">
+                  <svg class="aircraft-icon" viewBox="0 0 64 64" focusable="false">
+                    <path d="M32 2c2.4 0 4 2.2 4 5.2v18.5l21 13.2v6L36 39.5v13.2l7.5 4.7v4.2L32 58.2l-11.5 3.4v-4.2l7.5-4.7V39.5L7 44.9v-6l21-13.2V7.2C28 4.2 29.6 2 32 2Z" fill="currentColor"/>
+                  </svg>
+                </span>
                 <span class="runway-cancelled" id="runway-cancelled" aria-hidden="true" hidden>×</span>
               </div>
               <div class="runway-endpoints">
@@ -74,7 +78,11 @@
             </div>
             <aside class="arrival-summary" aria-label="Arrival estimate">
               <p class="eyebrow">ARRIVAL SUMMARY</p>
-              <span class="arrival-plane" aria-hidden="true">✈</span>
+              <span class="arrival-plane" aria-hidden="true">
+                <svg class="aircraft-icon" viewBox="0 0 64 64" focusable="false">
+                  <path d="M32 2c2.4 0 4 2.2 4 5.2v18.5l21 13.2v6L36 39.5v13.2l7.5 4.7v4.2L32 58.2l-11.5 3.4v-4.2l7.5-4.7V39.5L7 44.9v-6l21-13.2V7.2C28 4.2 29.6 2 32 2Z" fill="currentColor"/>
+                </svg>
+              </span>
               <span class="arrival-label">TIME TO ARRIVAL</span>
               <strong class="arrival-countdown" id="arrival-countdown">Not available</strong>
               <span class="arrival-time" id="arrival-time"></span>
