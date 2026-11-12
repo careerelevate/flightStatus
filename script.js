@@ -17,7 +17,9 @@ const arrivalCountdown = document.querySelector("#arrival-countdown");
 const arrivalTime = document.querySelector("#arrival-time");
 const arrivalDelay = document.querySelector("#arrival-delay");
 const lookupButton = liveFlightForm.querySelector("button");
+const refreshButton = document.querySelector("#flight-refresh");
 let arrivalCountdownTarget = null;
+let activeFlightIata = null;
 
 function formatAirport(airport, fallback) {
   return airport.iata || airport.airport || fallback;
@@ -252,17 +254,7 @@ function renderLiveFlight(flight) {
   updateArrivalSummary(flight);
 }
 
-liveFlightForm.addEventListener("submit", async (event) => {
-  event.preventDefault();
-  liveResult.hidden = true;
-  flightVisual.hidden = true;
-
-  const flightIata = liveFlightInput.value.trim().toUpperCase().replace(/[\s-]/g, "");
-  if (!/^[A-Z0-9]{2,3}\d{1,4}[A-Z]?$/.test(flightIata)) {
-    lookupMessage.textContent = "Enter a valid flight number, such as AA100.";
-    return;
-  }
-
+async function loadFlightStatus(flightIata, { refresh = false } = {}) {
   const apiUrl = window.FLIGHT_STATUS_API_URL;
   if (!apiUrl) {
     lookupMessage.textContent = "Live lookup is not configured yet. Follow the setup steps in the project README.";
@@ -270,11 +262,13 @@ liveFlightForm.addEventListener("submit", async (event) => {
   }
 
   lookupButton.disabled = true;
-  lookupMessage.textContent = "Checking flight status…";
+  refreshButton.disabled = true;
+  lookupMessage.textContent = refresh ? "Refreshing flight position…" : "Checking flight status…";
 
   try {
     const endpoint = new URL("/flight", apiUrl);
     endpoint.searchParams.set("flight_iata", flightIata);
+    if (refresh) endpoint.searchParams.set("refresh", "true");
     const response = await fetch(endpoint, { cache: "no-store" });
     const payload = await response.json();
 
@@ -283,19 +277,45 @@ liveFlightForm.addEventListener("submit", async (event) => {
     }
 
     renderLiveFlight(payload.flight);
-    const cacheMessage = payload.source === "database"
-      ? "Loaded from saved data."
-      : payload.cacheStored
-        ? "Saved for reuse for 5 minutes."
-        : "Could not save this result; another request may be needed next time.";
-    lookupMessage.textContent = `Status for ${payload.flight.flightNumber} · flight date ${payload.flight.flightDate || "not available"} · ${cacheMessage}`;
+    activeFlightIata = flightIata;
+    if (refresh) {
+      lookupMessage.textContent = `Position refreshed for ${payload.flight.flightNumber} from ${payload.source}.`;
+    } else {
+      const cacheMessage = payload.source === "database"
+        ? "Loaded from saved data."
+        : payload.cacheStored
+          ? "Saved for reuse for 5 minutes."
+          : "Could not save this result; another request may be needed next time.";
+      lookupMessage.textContent = `Status for ${payload.flight.flightNumber} · flight date ${payload.flight.flightDate || "not available"} · ${cacheMessage}`;
+    }
   } catch (error) {
     lookupMessage.textContent = error instanceof TypeError
       ? "Could not connect to the flight service. Please try again later."
-      : error.message;
+      : `${refresh ? "Position refresh failed" : "Flight lookup failed"}: ${error.message}`;
   } finally {
     lookupButton.disabled = false;
+    refreshButton.disabled = false;
   }
+}
+
+liveFlightForm.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  liveResult.hidden = true;
+  flightVisual.hidden = true;
+  activeFlightIata = null;
+
+  const flightIata = liveFlightInput.value.trim().toUpperCase().replace(/[\s-]/g, "");
+  if (!/^[A-Z0-9]{2,3}\d{1,4}[A-Z]?$/.test(flightIata)) {
+    lookupMessage.textContent = "Enter a valid flight number, such as AA100.";
+    return;
+  }
+
+  await loadFlightStatus(flightIata);
+});
+
+refreshButton.addEventListener("click", async () => {
+  if (!activeFlightIata) return;
+  await loadFlightStatus(activeFlightIata, { refresh: true });
 });
 
 const timeElement = document.querySelector("#current-time");

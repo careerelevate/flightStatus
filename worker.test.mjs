@@ -45,6 +45,49 @@ test("serves saved flight details from KV without calling a flight provider", as
   }
 });
 
+test("refresh requests bypass the saved flight result and store fresh provider data", async () => {
+  const originalFetch = globalThis.fetch;
+  let storedFlight;
+  globalThis.fetch = async (input) => {
+    assert.equal(new URL(input).searchParams.get("flight_iata"), "AA100");
+    return new Response(JSON.stringify({
+      data: [{
+        flight_status: "active",
+        flight: { iata: "AA100" },
+        departure: { iata: "AAA", latitude: 0, longitude: 0 },
+        arrival: { iata: "BBB", latitude: 0, longitude: 10 },
+        live: { latitude: 0, longitude: 6, altitude: 10000 },
+      }],
+    }), { status: 200 });
+  };
+
+  try {
+    const response = await worker.fetch(
+      new Request("https://flightstatus-api.example.workers.dev/flight?flight_iata=AA100&refresh=true"),
+      {
+        AVIATIONSTACK_API_KEY: "test-key",
+        FLIGHT_CACHE: {
+          get: async () => {
+            throw new Error("A refresh must not read the previous saved flight.");
+          },
+          put: async (key, value) => {
+            assert.equal(key, "flight:v2:AA100");
+            storedFlight = JSON.parse(value).flight;
+          },
+        },
+      },
+    );
+    const payload = await response.json();
+
+    assert.equal(response.status, 200);
+    assert.equal(payload.source, "Aviationstack");
+    assert.equal(payload.flight.progress.percentage, 60);
+    assert.equal(storedFlight.progress.percentage, 60);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
 test("rejects malformed flight numbers without calling the provider", async () => {
   const originalFetch = globalThis.fetch;
   globalThis.fetch = () => {

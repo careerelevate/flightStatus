@@ -481,8 +481,11 @@ export default {
       return jsonResponse({ error: "Enter a valid flight number, such as AA100." }, 400, origin);
     }
 
-    const cachedResponse = await getCachedFlight(env, flightIata, origin);
-    if (cachedResponse) return cachedResponse;
+    const forceRefresh = requestUrl.searchParams.get("refresh") === "true";
+    if (!forceRefresh) {
+      const cachedResponse = await getCachedFlight(env, flightIata, origin);
+      if (cachedResponse) return cachedResponse;
+    }
 
     if (!env.AVIATIONSTACK_API_KEY && !env.AIRLABS_API_KEY) {
       return jsonResponse({ error: "The flight lookup service is not configured yet." }, 503, origin);

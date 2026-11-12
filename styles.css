@@ -429,6 +429,33 @@ h1 {
   font-weight: 700;
 }
 
+.flight-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 10px;
+}
+
+.flight-refresh {
+  padding: 6px 9px;
+  border: 1px solid #dce5f6;
+  border-radius: 6px;
+  background: white;
+  color: #3768d2;
+  cursor: pointer;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.flight-refresh:hover:not(:disabled) {
+  border-color: #9ab4f3;
+  background: #f5f8ff;
+}
+
+.flight-refresh:disabled {
+  cursor: wait;
+  opacity: 0.6;
+}
+
 .runway-state {
   padding: 6px 9px;
   border-radius: 20px;
