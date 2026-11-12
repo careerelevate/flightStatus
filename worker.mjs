@@ -122,7 +122,7 @@ export default {
 
     const cache = globalThis.caches?.default;
     const cacheKey = new Request(
-      `${requestUrl.origin}/_cache/flight?flight_iata=${encodeURIComponent(flightIata)}&origin=${encodeURIComponent(origin)}`,
+      `${requestUrl.origin}/_cache/flight-v2?flight_iata=${encodeURIComponent(flightIata)}&origin=${encodeURIComponent(origin)}`,
     );
     const cachedResponse = await getCached(cache, cacheKey);
     if (cachedResponse) return cachedResponse;
@@ -157,7 +157,14 @@ export default {
       return jsonResponse({ error: `No current flight was found for ${flightIata}.` }, 404, origin);
     }
 
-    const flight = mapFlight(payload.data[0], flightIata);
+    const matchingRecord = payload.data.find((record) =>
+      text(record.flight?.iata)?.toUpperCase().replace(/[\s-]/g, "") === flightIata
+    );
+    if (!matchingRecord) {
+      return jsonResponse({ error: `No current flight was found for ${flightIata}.` }, 404, origin);
+    }
+
+    const flight = mapFlight(matchingRecord, flightIata);
     const response = jsonResponse({ flight }, 200, origin, 300);
     await putCached(cache, cacheKey, response);
     return response;

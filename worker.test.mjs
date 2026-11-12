@@ -84,6 +84,27 @@ test("maps Aviationstack flight data and allows the published site origin", asyn
   }
 });
 
+test("does not return an unrelated flight when the provider result does not match", async () => {
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async () => new Response(JSON.stringify({
+    data: [{
+      flight: { iata: "UL2026" },
+    }],
+  }), { status: 200 });
+
+  try {
+    const response = await worker.fetch(
+      new Request("https://flightstatus-api.example.workers.dev/flight?flight_iata=AA100"),
+      { AVIATIONSTACK_API_KEY: "test-key" },
+    );
+
+    assert.equal(response.status, 404);
+    assert.match((await response.json()).error, /No current flight was found for AA100/);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
 test("rejects browser requests from unapproved origins", async () => {
   const response = await worker.fetch(
     new Request("https://flightstatus-api.example.workers.dev/flight?flight_iata=AA100", {
