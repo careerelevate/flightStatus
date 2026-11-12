@@ -1,0 +1,1 @@
+window.FLIGHT_STATUS_API_URL = "";

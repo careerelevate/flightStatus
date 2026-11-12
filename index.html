@@ -7,6 +7,7 @@
     <meta name="description" content="A clear, easy-to-use flight status board.">
     <title>Flight Status — Live Board</title>
     <link rel="stylesheet" href="styles.css">
+    <script src="api-config.js"></script>
     <script src="script.js" defer></script>
   </head>
   <body>
@@ -31,10 +32,28 @@
         </div>
       </section>
 
+      <section class="live-lookup" aria-labelledby="live-lookup-title">
+        <div class="live-lookup-heading">
+          <div>
+            <p class="eyebrow">AVIATIONSTACK</p>
+            <h2 id="live-lookup-title">Look up a flight</h2>
+          </div>
+          <span class="live-badge"><span class="live-dot" aria-hidden="true"></span> LIVE LOOKUP</span>
+        </div>
+        <p class="lookup-copy">Enter an airline and flight number, such as AA100 or BA 283.</p>
+        <form class="lookup-form" id="live-flight-form">
+          <label class="sr-only" for="live-flight-number">Flight number</label>
+          <input id="live-flight-number" name="flight" type="text" placeholder="Flight number (e.g. AA100)" maxlength="10" autocomplete="off" required>
+          <button class="lookup-button" type="submit">Check status</button>
+        </form>
+        <p class="lookup-message" id="lookup-message" role="status" aria-live="polite">Live lookup will be available after the secure API proxy is configured.</p>
+        <article class="live-result" id="live-result" aria-live="polite" hidden></article>
+      </section>
+
       <section class="board" aria-label="Flight information">
         <div class="board-heading">
           <div>
-            <p class="eyebrow">TODAY'S MOVEMENTS</p>
+            <p class="eyebrow">SAMPLE SCHEDULE</p>
             <h2>Flight board</h2>
           </div>
           <span class="demo-label">DEMO DATA</span>
@@ -44,7 +63,7 @@
           <label class="search-box">
             <span class="search-icon" aria-hidden="true">⌕</span>
             <span class="sr-only">Search flights</span>
-            <input id="flight-search" type="search" placeholder="Search flight or destination" autocomplete="off">
+            <input id="flight-search" type="search" placeholder="Filter sample flights" autocomplete="off">
             <kbd>⌘ K</kbd>
           </label>
           <div class="filters" role="group" aria-label="Filter flights by status">
@@ -57,7 +76,7 @@
 
         <div class="flight-list" id="flight-list" aria-live="polite"></div>
         <p class="empty-state" id="empty-state" hidden>No flights match your search. Try another flight number or destination.</p>
-        <p class="data-note">This page uses sample flight information for demonstration. Check with your airline or airport for real-time updates.</p>
+        <p class="data-note">This board contains sample flight information. Use the flight lookup above for provider data, and confirm travel details with your airline.</p>
       </section>
     </main>
 

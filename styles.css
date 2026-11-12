@@ -138,6 +138,182 @@ h1 {
   color: #b8c0ce;
 }
 
+.live-lookup {
+  margin-bottom: 22px;
+  padding: 24px 30px 20px;
+  border: 1px solid #e8ecf3;
+  border-radius: 14px;
+  background: white;
+  box-shadow: 0 10px 34px rgb(25 42 74 / 5%);
+}
+
+.live-lookup-heading,
+.live-result-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.live-lookup-heading .eyebrow {
+  margin-bottom: 5px;
+  font-size: 9px;
+}
+
+.live-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: #6d7b91;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 1px;
+}
+
+.live-badge .live-dot {
+  width: 6px;
+  height: 6px;
+  background: #4bc493;
+}
+
+.lookup-copy {
+  margin: 9px 0 15px;
+  color: #788398;
+  font-size: 12px;
+}
+
+.lookup-form {
+  display: flex;
+  gap: 9px;
+}
+
+.lookup-form input {
+  flex: 1;
+  min-width: 0;
+  height: 42px;
+  padding: 0 12px;
+  border: 1px solid #e4e9f1;
+  border-radius: 7px;
+  outline: 0;
+  color: var(--navy);
+  font-size: 13px;
+}
+
+.lookup-form input:focus {
+  border-color: #9ab4f3;
+  box-shadow: 0 0 0 3px rgb(71 120 232 / 10%);
+}
+
+.lookup-button {
+  padding: 0 16px;
+  border: 0;
+  border-radius: 7px;
+  background: var(--blue);
+  color: white;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.lookup-button:hover {
+  background: #3566d2;
+}
+
+.lookup-button:disabled {
+  cursor: wait;
+  opacity: 0.65;
+}
+
+.lookup-message {
+  margin: 11px 0 0;
+  color: #8994a6;
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.live-result {
+  margin-top: 16px;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+}
+
+.live-airline,
+.live-flight-number,
+.live-detail-label,
+.live-detail-value {
+  display: block;
+}
+
+.live-airline {
+  color: #29364d;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.live-flight-number {
+  margin-top: 4px;
+  color: #8792a4;
+  font-size: 11px;
+}
+
+.live-status {
+  padding: 6px 9px;
+  border-radius: 20px;
+  font-size: 10px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.live-status--on-time,
+.live-status--landed,
+.live-status--scheduled {
+  background: #e9f7f1;
+  color: var(--green);
+}
+
+.live-status--in-flight {
+  background: #eaf0ff;
+  color: #3768d2;
+}
+
+.live-status--cancelled,
+.live-status--incident,
+.live-status--diverted {
+  background: #fff3e5;
+  color: var(--orange);
+}
+
+.live-status--unknown {
+  background: #edf1f7;
+  color: #66748a;
+}
+
+.live-route {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 15px;
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+}
+
+.live-detail-label {
+  margin-bottom: 5px;
+  color: #8792a4;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.7px;
+}
+
+.live-detail-value {
+  color: #29364d;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
 .board {
   padding: 27px 30px 20px;
   border: 1px solid #e8ecf3;
@@ -436,6 +612,10 @@ footer {
   }
 
   .board {
+    padding: 22px 18px 17px;
+  }
+
+  .live-lookup {
     padding: 22px 18px 17px;
   }
 
