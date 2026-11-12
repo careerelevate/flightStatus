@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#101a30">
+    <meta name="description" content="A clear, easy-to-use flight status board.">
+    <title>Flight Status — Live Board</title>
+    <link rel="stylesheet" href="styles.css">
+    <script src="script.js" defer></script>
+  </head>
+  <body>
+    <header class="topbar">
+      <a class="brand" href="#" aria-label="Flight Status home">
+        <span class="brand-mark" aria-hidden="true">✈</span>
+        <span>flight<span class="brand-light">status</span></span>
+      </a>
+      <span class="board-label"><span class="live-dot" aria-hidden="true"></span> AIRPORT BOARD</span>
+    </header>
+
+    <main>
+      <section class="intro" aria-labelledby="page-title">
+        <p class="eyebrow">YOUR JOURNEY, AT A GLANCE</p>
+        <h1 id="page-title">Flight status</h1>
+        <p class="intro-copy">Find your flight and get the latest schedule at a glance.</p>
+        <div class="board-time">
+          <span class="time-icon" aria-hidden="true">◷</span>
+          <span id="current-time">Local time</span>
+          <span class="time-separator" aria-hidden="true">·</span>
+          <span>Times shown are local</span>
+        </div>
+      </section>
+
+      <section class="board" aria-label="Flight information">
+        <div class="board-heading">
+          <div>
+            <p class="eyebrow">TODAY'S MOVEMENTS</p>
+            <h2>Flight board</h2>
+          </div>
+          <span class="demo-label">DEMO DATA</span>
+        </div>
+
+        <div class="controls">
+          <label class="search-box">
+            <span class="search-icon" aria-hidden="true">⌕</span>
+            <span class="sr-only">Search flights</span>
+            <input id="flight-search" type="search" placeholder="Search flight or destination" autocomplete="off">
+            <kbd>⌘ K</kbd>
+          </label>
+          <div class="filters" role="group" aria-label="Filter flights by status">
+            <button class="filter-button is-active" type="button" data-filter="all" aria-pressed="true">All flights</button>
+            <button class="filter-button" type="button" data-filter="On time" aria-pressed="false">On time</button>
+            <button class="filter-button" type="button" data-filter="Delayed" aria-pressed="false">Delayed</button>
+            <button class="filter-button" type="button" data-filter="Boarding" aria-pressed="false">Boarding</button>
+          </div>
+        </div>
+
+        <div class="flight-list" id="flight-list" aria-live="polite"></div>
+        <p class="empty-state" id="empty-state" hidden>No flights match your search. Try another flight number or destination.</p>
+        <p class="data-note">This page uses sample flight information for demonstration. Check with your airline or airport for real-time updates.</p>
+      </section>
+    </main>
+
+    <footer>
+      <span>Made for smoother journeys.</span>
+      <span>Flight information can change. Please confirm with your airline.</span>
+    </footer>
+  </body>
+</html>
