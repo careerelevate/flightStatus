@@ -28,10 +28,10 @@ function corsHeaders(origin) {
   return headers;
 }
 
-function jsonResponse(body, status, origin, maxAge = 0) {
+function jsonResponse(body, status, origin) {
   const headers = corsHeaders(origin);
   headers.set("Content-Type", "application/json; charset=utf-8");
-  headers.set("Cache-Control", maxAge ? `public, max-age=${maxAge}` : "no-store");
+  headers.set("Cache-Control", "no-store");
 
   return new Response(JSON.stringify(body), { status, headers });
 }
@@ -148,30 +148,46 @@ function findAirlabsFlight(payload, requestedFlight) {
   return records.find((record) => normalizeFlightIata(record?.flight_iata) === requestedFlight);
 }
 
-async function getCached(cache, key) {
-  if (!cache) return null;
+async function getCachedFlight(env, flightIata, origin) {
+  if (!env.FLIGHT_CACHE) return null;
 
   try {
-    return await cache.match(key);
-  } catch {
-    console.warn("Flight lookup cache read failed.");
+    const cached = await env.FLIGHT_CACHE.get(`flight:v1:${flightIata}`, { type: "json" });
+    if (!cached) return null;
+    if (!cached.flight) {
+      console.error("Stored flight lookup data is invalid.");
+      return null;
+    }
+
+    return jsonResponse(
+      { flight: cached.flight, source: "database", cacheStored: true },
+      200,
+      origin,
+    );
+  } catch (error) {
+    console.error("Flight KV read failed; querying the flight providers.", error);
     return null;
   }
 }
 
-async function putCached(cache, key, response) {
-  if (!cache) return;
-
-  try {
-    await cache.put(key, response.clone());
-  } catch {
-    console.warn("Flight lookup cache write failed.");
+async function responseWithSavedFlight(flight, source, env, flightIata, origin) {
+  let cacheStored = false;
+  if (env.FLIGHT_CACHE) {
+    try {
+      await env.FLIGHT_CACHE.put(
+        `flight:v1:${flightIata}`,
+        JSON.stringify({ flight }),
+        { expirationTtl: 300 },
+      );
+      cacheStored = true;
+    } catch (error) {
+      console.error("Flight result could not be saved to KV.", error);
+    }
+  } else {
+    console.error("FLIGHT_CACHE binding is missing; flight result was not saved.");
   }
-}
 
-async function cacheSuccessfulResponse(cache, key, response) {
-  if (response.ok) await putCached(cache, key, response);
-  return response;
+  return jsonResponse({ flight, source, cacheStored }, 200, origin);
 }
 
 async function lookupAirlabs(flightIata, env, origin) {
@@ -214,7 +230,7 @@ async function lookupAirlabs(flightIata, env, origin) {
     return jsonResponse({ error: `No current flight was found for ${flightIata}.` }, 404, origin);
   }
 
-  return jsonResponse({ flight: mapAirlabsFlight(matchingRecord, flightIata) }, 200, origin, 300);
+  return mapAirlabsFlight(matchingRecord, flightIata);
 }
 
 export default {
@@ -246,22 +262,23 @@ export default {
       return jsonResponse({ error: "Enter a valid flight number, such as AA100." }, 400, origin);
     }
 
+    const cachedResponse = await getCachedFlight(env, flightIata, origin);
+    if (cachedResponse) return cachedResponse;
+
     if (!env.AVIATIONSTACK_API_KEY && !env.AIRLABS_API_KEY) {
       return jsonResponse({ error: "The flight lookup service is not configured yet." }, 503, origin);
     }
 
-    const cache = globalThis.caches?.default;
-    const cacheKey = new Request(
-      `${requestUrl.origin}/_cache/flight-v2?flight_iata=${encodeURIComponent(flightIata)}&origin=${encodeURIComponent(origin)}`,
-    );
-    const cachedResponse = await getCached(cache, cacheKey);
-    if (cachedResponse) return cachedResponse;
-
     if (!env.AVIATIONSTACK_API_KEY) {
-      return cacheSuccessfulResponse(
-        cache,
-        cacheKey,
-        await lookupAirlabs(flightIata, env, origin),
+      const backupFlight = await lookupAirlabs(flightIata, env, origin);
+      if (backupFlight instanceof Response) return backupFlight;
+
+      return responseWithSavedFlight(
+        backupFlight,
+        "AirLabs",
+        env,
+        flightIata,
+        origin,
       );
     }
 
@@ -281,14 +298,20 @@ export default {
       payload = await apiResponse.json();
     } catch {
       if (apiResponse.status === 429) {
-        return cacheSuccessfulResponse(cache, cacheKey, await lookupAirlabs(flightIata, env, origin));
+        const backupFlight = await lookupAirlabs(flightIata, env, origin);
+        if (backupFlight instanceof Response) return backupFlight;
+
+        return responseWithSavedFlight(backupFlight, "AirLabs", env, flightIata, origin);
       }
 
       return jsonResponse({ error: "The flight data provider returned an invalid response." }, 502, origin);
     }
 
     if (aviationstackLimitReached(apiResponse, payload)) {
-      return cacheSuccessfulResponse(cache, cacheKey, await lookupAirlabs(flightIata, env, origin));
+      const backupFlight = await lookupAirlabs(flightIata, env, origin);
+      if (backupFlight instanceof Response) return backupFlight;
+
+      return responseWithSavedFlight(backupFlight, "AirLabs", env, flightIata, origin);
     }
 
     if (!apiResponse.ok || payload.error) {
@@ -311,7 +334,6 @@ export default {
     }
 
     const flight = mapFlight(matchingRecord, flightIata);
-    const response = jsonResponse({ flight }, 200, origin, 300);
-    return cacheSuccessfulResponse(cache, cacheKey, response);
+    return responseWithSavedFlight(flight, "Aviationstack", env, flightIata, origin);
   },
 };

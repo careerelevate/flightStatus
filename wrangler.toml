@@ -2,3 +2,7 @@ name = "flightstatus-api"
 main = "worker.mjs"
 compatibility_date = "2026-11-11"
 workers_dev = true
+
+[[kv_namespaces]]
+binding = "FLIGHT_CACHE"
+id = "521df120a77d45a3b7c8e4b42c70fee1"

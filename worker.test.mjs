@@ -14,6 +14,37 @@ test("reports missing Aviationstack credentials explicitly", async () => {
   assert.match((await response.json()).error, /not configured/i);
 });
 
+test("serves saved flight details from KV without calling a flight provider", async () => {
+  const originalFetch = globalThis.fetch;
+  let requestedKey;
+  globalThis.fetch = () => {
+    throw new Error("A provider should not be called for a KV hit.");
+  };
+
+  try {
+    const response = await worker.fetch(
+      new Request("https://flightstatus-api.example.workers.dev/flight?flight_iata=AA100"),
+      {
+        FLIGHT_CACHE: {
+          get: async (key, options) => {
+            requestedKey = [key, options];
+            return { flight: { flightNumber: "AA100", flightDate: "2026-11-12" } };
+          },
+        },
+      },
+    );
+    const payload = await response.json();
+
+    assert.equal(response.status, 200);
+    assert.deepEqual(requestedKey, ["flight:v1:AA100", { type: "json" }]);
+    assert.equal(payload.source, "database");
+    assert.equal(payload.cacheStored, true);
+    assert.equal(payload.flight.flightNumber, "AA100");
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
 test("rejects malformed flight numbers without calling the provider", async () => {
   const originalFetch = globalThis.fetch;
   globalThis.fetch = () => {
@@ -36,6 +67,8 @@ test("rejects malformed flight numbers without calling the provider", async () =
 test("maps Aviationstack flight data and allows the published site origin", async () => {
   const originalFetch = globalThis.fetch;
   let requestedUrl;
+  let storedValue;
+  let storedOptions;
   globalThis.fetch = async (input) => {
     requestedUrl = new URL(input);
     return new Response(JSON.stringify({
@@ -67,7 +100,17 @@ test("maps Aviationstack flight data and allows the published site origin", asyn
       new Request("https://flightstatus-api.example.workers.dev/flight?flight_iata=aa-100", {
         headers: { Origin: origin },
       }),
-      { AVIATIONSTACK_API_KEY: "test-key" },
+      {
+        AVIATIONSTACK_API_KEY: "test-key",
+        FLIGHT_CACHE: {
+          get: async () => null,
+          put: async (key, value, options) => {
+            assert.equal(key, "flight:v1:AA100");
+            storedValue = JSON.parse(value);
+            storedOptions = options;
+          },
+        },
+      },
     );
     const payload = await response.json();
 
@@ -79,6 +122,42 @@ test("maps Aviationstack flight data and allows the published site origin", asyn
     assert.equal(payload.flight.status, "In flight");
     assert.equal(payload.flight.departure.iata, "JFK");
     assert.equal(payload.flight.arrival.iata, "LAX");
+    assert.equal(payload.source, "Aviationstack");
+    assert.equal(payload.cacheStored, true);
+    assert.equal(storedValue.flight.flightNumber, "AA100");
+    assert.deepEqual(storedOptions, { expirationTtl: 300 });
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("returns a live result but reports when KV could not save it", async () => {
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async () => new Response(JSON.stringify({
+    data: [{
+      flight_status: "scheduled",
+      flight: { iata: "AA100" },
+    }],
+  }), { status: 200 });
+
+  try {
+    const response = await worker.fetch(
+      new Request("https://flightstatus-api.example.workers.dev/flight?flight_iata=AA100"),
+      {
+        AVIATIONSTACK_API_KEY: "test-key",
+        FLIGHT_CACHE: {
+          get: async () => null,
+          put: async () => {
+            throw new Error("KV unavailable");
+          },
+        },
+      },
+    );
+    const payload = await response.json();
+
+    assert.equal(response.status, 200);
+    assert.equal(payload.flight.flightNumber, "AA100");
+    assert.equal(payload.cacheStored, false);
   } finally {
     globalThis.fetch = originalFetch;
   }
@@ -108,6 +187,7 @@ test("does not return an unrelated flight when the provider result does not matc
 test("uses AirLabs when Aviationstack reports its request limit was reached", async () => {
   const originalFetch = globalThis.fetch;
   const requestedUrls = [];
+  let storedFlight;
   globalThis.fetch = async (input) => {
     const url = new URL(input);
     requestedUrls.push(url);
@@ -141,7 +221,17 @@ test("uses AirLabs when Aviationstack reports its request limit was reached", as
   try {
     const response = await worker.fetch(
       new Request("https://flightstatus-api.example.workers.dev/flight?flight_iata=AA100"),
-      { AVIATIONSTACK_API_KEY: "aviationstack-key", AIRLABS_API_KEY: "airlabs-key" },
+      {
+        AVIATIONSTACK_API_KEY: "aviationstack-key",
+        AIRLABS_API_KEY: "airlabs-key",
+        FLIGHT_CACHE: {
+          get: async () => null,
+          put: async (key, value) => {
+            assert.equal(key, "flight:v1:AA100");
+            storedFlight = JSON.parse(value).flight;
+          },
+        },
+      },
     );
     const payload = await response.json();
 
@@ -158,6 +248,9 @@ test("uses AirLabs when Aviationstack reports its request limit was reached", as
     assert.equal(payload.flight.departure.scheduled, "2026-11-12T18:00:00Z");
     assert.equal(payload.flight.departure.timezoneLabel, "UTC");
     assert.equal(payload.flight.arrival.iata, "LAX");
+    assert.equal(payload.source, "AirLabs");
+    assert.equal(payload.cacheStored, true);
+    assert.equal(storedFlight.flightNumber, "AA100");
   } finally {
     globalThis.fetch = originalFetch;
   }

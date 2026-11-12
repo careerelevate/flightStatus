@@ -111,7 +111,12 @@ liveFlightForm.addEventListener("submit", async (event) => {
     }
 
     renderLiveFlight(payload.flight);
-    lookupMessage.textContent = `Status for ${payload.flight.flightNumber} · flight date ${payload.flight.flightDate || "not available"}.`;
+    const cacheMessage = payload.source === "database"
+      ? "Loaded from saved data."
+      : payload.cacheStored
+        ? "Saved for reuse for 5 minutes."
+        : "Could not save this result; another request may be needed next time.";
+    lookupMessage.textContent = `Status for ${payload.flight.flightNumber} · flight date ${payload.flight.flightDate || "not available"} · ${cacheMessage}`;
   } catch (error) {
     lookupMessage.textContent = error instanceof TypeError
       ? "Could not connect to the flight service. Please try again later."
