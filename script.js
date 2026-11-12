@@ -63,8 +63,14 @@ function renderLiveFlight(flight) {
 
   const schedule = document.createElement("div");
   schedule.className = "live-route";
-  addDetail(schedule, "DEPARTURE", formatFlightTime(flight.departure.scheduled, flight.departure.timezone));
-  addDetail(schedule, "ARRIVAL", formatFlightTime(flight.arrival.scheduled, flight.arrival.timezone));
+  const departureLabel = flight.departure.timezoneLabel
+    ? `DEPARTURE (${flight.departure.timezoneLabel})`
+    : "DEPARTURE";
+  const arrivalLabel = flight.arrival.timezoneLabel
+    ? `ARRIVAL (${flight.arrival.timezoneLabel})`
+    : "ARRIVAL";
+  addDetail(schedule, departureLabel, formatFlightTime(flight.departure.scheduled, flight.departure.timezone));
+  addDetail(schedule, arrivalLabel, formatFlightTime(flight.arrival.scheduled, flight.arrival.timezone));
 
   const details = document.createElement("div");
   details.className = "live-route";
