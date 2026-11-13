@@ -6,9 +6,9 @@
     <meta name="theme-color" content="#101a30">
     <meta name="description" content="A clear, easy-to-use flight status board.">
     <title>Flight Status — Live Board</title>
-    <link rel="stylesheet" href="styles.css?v=4">
+    <link rel="stylesheet" href="styles.css?v=5">
     <script src="api-config.js"></script>
-    <script src="script.js?v=6" defer></script>
+    <script src="script.js?v=7" defer></script>
   </head>
   <body>
     <header class="topbar">
@@ -36,66 +36,87 @@
         <div class="live-lookup-heading">
           <div>
             <p class="eyebrow">AVIATIONSTACK</p>
-            <h2 id="live-lookup-title">Look up a flight</h2>
+            <h2 id="live-lookup-title">Plan your flight itinerary</h2>
           </div>
           <span class="live-badge"><span class="live-dot" aria-hidden="true"></span> LIVE LOOKUP</span>
         </div>
-        <p class="lookup-copy">Enter an airline and flight number, such as AA100 or BA 283.</p>
+        <p class="lookup-copy">Enter up to four flight numbers in the order you plan to travel.</p>
         <form class="lookup-form" id="live-flight-form">
-          <label class="sr-only" for="live-flight-number">Flight number</label>
-          <input id="live-flight-number" name="flight" type="text" placeholder="Flight number (e.g. AA100)" maxlength="10" autocomplete="off" required>
-          <button class="lookup-button" type="submit">Check status</button>
+          <div class="flight-number-list" id="flight-number-list">
+            <div class="flight-number-row">
+              <label class="sr-only" for="live-flight-number">Flight 1 number</label>
+              <input class="flight-number-input" id="live-flight-number" name="flight" type="text" placeholder="Flight number (e.g. AA100)" maxlength="10" autocomplete="off" required>
+              <button class="remove-flight" type="button" aria-label="Remove flight 1" hidden>Remove</button>
+            </div>
+          </div>
+          <div class="lookup-actions">
+            <button class="add-flight" id="add-flight" type="button">+ Add flight</button>
+            <button class="lookup-button" type="submit">Check itinerary</button>
+          </div>
         </form>
         <p class="lookup-message" id="lookup-message" role="status" aria-live="polite">Enter a flight number above to check its status.</p>
-        <article class="live-result" id="live-result" aria-live="polite" hidden></article>
-        <section class="flight-visual" id="flight-visual" aria-label="Flight path" hidden>
-          <div class="flight-visual-grid">
-            <div class="flight-path">
-              <div class="runway-heading">
-                <div>
-                  <p class="eyebrow">FLIGHT PATH</p>
-                  <p class="runway-caption" id="runway-caption"></p>
-                </div>
-                <span class="runway-state" id="runway-state"></span>
+        <div class="itinerary-flight-details" id="live-result" aria-live="polite" hidden></div>
+        <section class="itinerary-visuals" id="flight-visual" aria-label="Flight itinerary" hidden>
+          <div class="itinerary-leg-list" id="flight-visual-list"></div>
+        </section>
+      </section>
+    </main>
+
+    <template id="flight-input-template">
+      <div class="flight-number-row">
+        <label class="sr-only"></label>
+        <input class="flight-number-input" name="flight" type="text" placeholder="Flight number (e.g. AA100)" maxlength="10" autocomplete="off" required>
+        <button class="remove-flight" type="button" hidden>Remove</button>
+      </div>
+    </template>
+    <template id="flight-visual-template">
+      <article class="flight-visual">
+        <div class="flight-visual-grid">
+          <div class="flight-path">
+            <div class="runway-heading">
+              <div>
+                <p class="eyebrow">FLIGHT PATH</p>
+                <p class="runway-caption"></p>
               </div>
-              <div class="flight-actions">
-                <button class="flight-refresh" id="flight-refresh" type="button">Refresh position</button>
-              </div>
-              <div class="runway-track" id="runway-track" role="img">
-                <div class="runway-fill" id="runway-fill"></div>
-                <div class="runway-centerline" aria-hidden="true"></div>
-                <span class="runway-plane" id="runway-plane" aria-hidden="true">
-                  <svg class="aircraft-icon" viewBox="0 0 64 64" focusable="false">
-                    <path d="M32 2c2.4 0 4 2.2 4 5.2v18.5l21 13.2v6L36 39.5v13.2l7.5 4.7v4.2L32 58.2l-11.5 3.4v-4.2l7.5-4.7V39.5L7 44.9v-6l21-13.2V7.2C28 4.2 29.6 2 32 2Z" fill="currentColor"/>
-                  </svg>
-                </span>
-                <span class="runway-cancelled" id="runway-cancelled" aria-hidden="true" hidden>×</span>
-              </div>
-              <div class="runway-endpoints">
-                <span id="runway-origin"></span>
-                <span id="runway-destination"></span>
-              </div>
-              <p class="runway-metrics" id="runway-metrics"></p>
-              <p class="runway-note" id="runway-note" hidden></p>
-              <p class="runway-legend">Green: on time · Yellow: 1–30 min late · Red: 31–120 min late · Purple: over 2 hours late</p>
+              <span class="runway-state"></span>
             </div>
-            <aside class="arrival-summary" aria-label="Arrival estimate">
-              <p class="eyebrow">ARRIVAL SUMMARY</p>
-              <span class="arrival-plane" aria-hidden="true">
+            <div class="flight-actions">
+              <button class="flight-refresh" type="button">Refresh position</button>
+            </div>
+            <div class="runway-track" role="img">
+              <div class="runway-fill"></div>
+              <div class="runway-centerline" aria-hidden="true"></div>
+              <span class="runway-plane" aria-hidden="true">
                 <svg class="aircraft-icon" viewBox="0 0 64 64" focusable="false">
                   <path d="M32 2c2.4 0 4 2.2 4 5.2v18.5l21 13.2v6L36 39.5v13.2l7.5 4.7v4.2L32 58.2l-11.5 3.4v-4.2l7.5-4.7V39.5L7 44.9v-6l21-13.2V7.2C28 4.2 29.6 2 32 2Z" fill="currentColor"/>
                 </svg>
               </span>
-              <span class="arrival-label">TIME TO ARRIVAL</span>
-              <strong class="arrival-countdown" id="arrival-countdown">Not available</strong>
-              <span class="arrival-time" id="arrival-time"></span>
-              <span class="arrival-label arrival-delay-label">DELAY</span>
-              <strong class="arrival-delay" id="arrival-delay">Not available</strong>
-            </aside>
+              <span class="runway-cancelled" aria-hidden="true" hidden>×</span>
+            </div>
+            <div class="runway-endpoints">
+              <span class="runway-origin"></span>
+              <span class="runway-destination"></span>
+            </div>
+            <p class="runway-metrics"></p>
+            <p class="runway-note" hidden></p>
+            <p class="runway-legend">Green: on time · Yellow: 1–30 min late · Red: 31–120 min late · Purple: over 2 hours late</p>
           </div>
-        </section>
-      </section>
-    </main>
+          <aside class="arrival-summary" aria-label="Arrival estimate">
+            <p class="eyebrow">ARRIVAL SUMMARY</p>
+            <span class="arrival-plane" aria-hidden="true">
+              <svg class="aircraft-icon" viewBox="0 0 64 64" focusable="false">
+                <path d="M32 2c2.4 0 4 2.2 4 5.2v18.5l21 13.2v6L36 39.5v13.2l7.5 4.7v4.2L32 58.2l-11.5 3.4v-4.2l7.5-4.7V39.5L7 44.9v-6l21-13.2V7.2C28 4.2 29.6 2 32 2Z" fill="currentColor"/>
+              </svg>
+            </span>
+            <span class="arrival-label">TIME TO ARRIVAL</span>
+            <strong class="arrival-countdown">Not available</strong>
+            <span class="arrival-time"></span>
+            <span class="arrival-label arrival-delay-label">DELAY</span>
+            <strong class="arrival-delay">Not available</strong>
+          </aside>
+        </div>
+      </article>
+    </template>
 
     <footer>
       <span>Made for smoother journeys.</span>

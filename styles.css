@@ -181,13 +181,24 @@ h1 {
 }
 
 .lookup-form {
-  display: flex;
-  gap: 9px;
+  display: grid;
+  gap: 10px;
+}
+
+.flight-number-list {
+  display: grid;
+  gap: 8px;
+}
+
+.flight-number-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
 }
 
 .lookup-form input {
-  flex: 1;
   min-width: 0;
+  width: 100%;
   height: 42px;
   padding: 0 12px;
   border: 1px solid #e4e9f1;
@@ -203,6 +214,7 @@ h1 {
 }
 
 .lookup-button {
+  min-height: 42px;
   padding: 0 16px;
   border: 0;
   border-radius: 7px;
@@ -222,6 +234,38 @@ h1 {
   opacity: 0.65;
 }
 
+.lookup-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 9px;
+}
+
+.add-flight,
+.remove-flight {
+  min-height: 36px;
+  padding: 0 11px;
+  border: 1px solid #e4e9f1;
+  border-radius: 7px;
+  background: white;
+  color: #53627a;
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.add-flight:hover:not(:disabled),
+.remove-flight:hover:not(:disabled) {
+  border-color: #9ab4f3;
+  background: #f5f8ff;
+}
+
+.add-flight:disabled,
+.remove-flight:disabled {
+  cursor: wait;
+  opacity: 0.55;
+}
+
 .lookup-message {
   margin: 11px 0 0;
   color: #8994a6;
@@ -234,6 +278,17 @@ h1 {
   padding: 16px;
   border: 1px solid var(--line);
   border-radius: 9px;
+}
+
+.live-result--error {
+  border-color: #f2d3d3;
+  background: #fffafa;
+}
+
+.live-result--error p {
+  margin: 7px 0 0;
+  color: #8d4343;
+  font-size: 11px;
 }
 
 .live-airline,
@@ -328,6 +383,64 @@ h1 {
   border: 1px solid var(--line);
   border-radius: 9px;
   background: #fbfcfe;
+}
+
+.layover-card {
+  position: relative;
+  margin: 9px 0 0 25px;
+  padding: 10px 13px 10px 15px;
+  border-left: 2px dashed #b6c4df;
+}
+
+.layover-card::before {
+  position: absolute;
+  top: 13px;
+  left: -6px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #6684c3;
+  content: "";
+}
+
+.layover-card .eyebrow {
+  margin-bottom: 4px;
+  font-size: 9px;
+}
+
+.layover-description {
+  margin: 0;
+  color: #53627a;
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.layover-duration {
+  display: block;
+  margin-top: 4px;
+  color: #29364d;
+  font-size: 12px;
+}
+
+.layover-card--warning {
+  border-color: #ddb45b;
+}
+
+.layover-card--warning::before {
+  background: #bb6b19;
+}
+
+.layover-card--warning .layover-duration {
+  color: #8a6400;
+}
+
+.itinerary-leg-error {
+  margin: 16px 0 0;
+  padding: 12px;
+  border: 1px solid #f2d3d3;
+  border-radius: 8px;
+  color: #8d4343;
+  font-size: 11px;
 }
 
 .flight-visual-grid {
