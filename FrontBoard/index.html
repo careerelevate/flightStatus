@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#111827">
+    <title>FrontBoard</title>
+    <link rel="stylesheet" href="styles.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js" defer></script>
+    <script src="script.js" defer></script>
+  </head>
+  <body>
+    <aside class="sidebar">
+      <a class="brand" href="#" aria-label="FrontBoard home">
+        <span class="brand-mark">F</span>
+        <span>FrontBoard</span>
+      </a>
+      <nav aria-label="Main navigation">
+        <button class="nav-item active" type="button" data-view="All tickets">
+          <span aria-hidden="true">◫</span> All tickets
+        </button>
+        <button class="nav-item" type="button" data-view="Flights">
+          <span aria-hidden="true">✈</span> Flights
+        </button>
+        <button class="nav-item" type="button" data-view="Bus">
+          <span aria-hidden="true">▰</span> Bus
+        </button>
+      </nav>
+      <div class="sidebar-footer">
+        <span class="avatar">NB</span>
+        <div>
+          <strong>Navis B.</strong>
+          <small>Travel desk</small>
+        </div>
+      </div>
+    </aside>
+
+    <main class="board">
+      <section class="feed-section">
+        <header class="feed-header">
+          <div>
+            <p class="eyebrow">TRAVEL FEED</p>
+            <h1 id="view-title">Upcoming tickets</h1>
+          </div>
+          <label class="search-box">
+            <span aria-hidden="true">⌕</span>
+            <input id="ticket-search" type="search" placeholder="Search tickets" aria-label="Search tickets">
+          </label>
+        </header>
+
+        <div class="summary-row" aria-label="Ticket summary">
+          <article class="summary-card">
+            <span class="summary-icon flight">✈</span>
+            <div><small>Flights</small><strong id="flight-count">0</strong></div>
+          </article>
+          <article class="summary-card">
+            <span class="summary-icon bus">▰</span>
+            <div><small>Bus</small><strong id="bus-count">0</strong></div>
+          </article>
+          <article class="summary-card">
+            <span class="summary-icon passenger">◎</span>
+            <div><small>Passengers</small><strong id="passenger-count">0</strong></div>
+          </article>
+        </div>
+
+        <div class="ticket-list" id="ticket-list">
+          <article class="empty-state">
+            <span class="empty-icon">⇧</span>
+            <h2>No tickets loaded</h2>
+            <p>Upload a CSV, JSON, text, or PDF document to populate this board.</p>
+          </article>
+        </div>
+      </section>
+
+      <aside class="right-panel" aria-label="Time and document upload">
+        <section class="clock-card">
+          <p class="eyebrow">EASTERN TIME</p>
+          <time id="est-clock">--:--:--</time>
+          <div class="clock-meta">
+            <strong id="est-period">EST</strong>
+            <span id="est-date">Loading date...</span>
+          </div>
+        </section>
+
+        <section class="upload-card">
+          <div class="upload-heading">
+            <div>
+              <p class="eyebrow">DOCUMENT FEED</p>
+              <h2>Upload tickets</h2>
+            </div>
+            <span class="file-count" id="file-count">0</span>
+          </div>
+
+          <label class="drop-zone" id="drop-zone" for="document-upload">
+            <input id="document-upload" type="file" accept=".csv,.json,.txt,.pdf" multiple>
+            <span class="upload-icon" aria-hidden="true">⇧</span>
+            <strong>Choose documents</strong>
+            <small>CSV, JSON, TXT or PDF</small>
+          </label>
+
+          <div class="loaded-files" id="loaded-files"></div>
+          <p class="upload-status" id="upload-status" role="status" aria-live="polite">Waiting for a document</p>
+          <button class="clear-button" id="clear-tickets" type="button" disabled>Clear all tickets</button>
+        </section>
+      </aside>
+    </main>
+  </body>
+</html>
