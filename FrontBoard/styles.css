@@ -252,6 +252,16 @@ h2 { font-size: 17px; }
 .ticket-details div { display: grid; gap: 5px; }
 .ticket-details small { color: var(--muted); font-size: 10px; text-transform: uppercase; letter-spacing: .08em; }
 .ticket-details strong { font-size: 12px; overflow-wrap: anywhere; }
+.travellers { grid-column: 1 / -1; }
+.passenger-row {
+  display: grid;
+  grid-template-columns: minmax(120px, 1fr) minmax(180px, 1fr);
+  gap: 8px;
+  padding: 5px 0;
+  border-top: 1px solid var(--line);
+}
+.passenger-row:first-of-type { border-top: 0; }
+.passenger-row span { color: var(--muted); font-size: 11px; }
 
 .right-panel { display: grid; align-content: start; gap: 18px; }
 .clock-card, .upload-card {

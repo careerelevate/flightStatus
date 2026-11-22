@@ -162,6 +162,9 @@ function parseDocument(fileName, text) {
 }
 
 function parseTextFeed(text) {
+  const busTicket = parseBusTicketText(text);
+  if (busTicket) return [busTicket];
+
   const blocks = text
     .split(/\n\s*\n|(?=^(?:flight|bus|ticket)\s*[:#-])/im)
     .map((block) => block.trim())
@@ -173,6 +176,68 @@ function parseTextFeed(text) {
   }
 
   return blocks.map((block) => normalizeTicket(parseKeyValueLines(block.split(/\n|[|;]/))));
+}
+
+function parseBusTicketText(text) {
+  if (!/\b(?:bus booking|bus ticket|e-ticket)\b/i.test(text)) return null;
+
+  const ticketId = text.match(/Ticket\s*ID:\s*([A-Z0-9]+)/i)?.[1];
+  const pnr = text.match(/PNR:\s*([A-Z0-9]+)/i)?.[1];
+  const orderNumber = text.match(/Order\s*#\s*([0-9-]+)/i)?.[1];
+
+  const routeMatch = text.match(/PNR:\s*[A-Z0-9]+\s+([A-Za-z][A-Za-z\s]+?)\s+([A-Za-z][A-Za-z\s]+?)\s+(?:[A-Z][A-Z\s]*LINES\b)/i);
+  let origin = routeMatch?.[1]?.trim() || "";
+  let destination = routeMatch?.[2]?.trim() || "";
+
+  if (!origin || !destination) {
+    const routeBeforeOperator = text.match(/PNR:\s*[A-Z0-9]+\s+(.{2,80}?)\s+(?:[A-Z][A-Z\s]*LINES\b)/i)?.[1]?.trim();
+    if (routeBeforeOperator) {
+      const arrowParts = routeBeforeOperator.split(/\s+->\s+/);
+      if (arrowParts.length === 2) {
+        origin = arrowParts[0].trim();
+        destination = arrowParts[1].trim();
+      } else {
+        const knownRoute = routeBeforeOperator.match(/^(.+?)\s+(Velankanni|Chennai|Madurai|Coimbatore|Bangalore|Bengaluru|Hyderabad)$/i);
+        if (knownRoute) {
+          origin = knownRoute[1].trim();
+          destination = knownRoute[2].trim();
+        }
+      }
+    }
+  }
+
+  const times = [...text.matchAll(/(?:\b|[^\d])(\d{1,2}:\d{2}\s*(?:AM|PM))/gi)].map((match) => match[1].replace(/\s+/g, " ").toUpperCase());
+  const dates = [...text.matchAll(/\b((?:Sun|Mon|Tue|Wed|Thu|Fri|Sat),\s*\d{1,2}\s+(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec))\b/gi)].map((match) => match[1]);
+
+  const passengers = [];
+  const travellerPattern = /([A-Za-z][A-Za-z.-]*(?:\s+[A-Za-z][A-Za-z.-]*)*?)\s+(Female|Male),\s*(\d+)\s*years?\s+([A-Z0-9]+)/gi;
+  const travellerStart = text.search(/Traveller Details|Travellers\s+Gender/i);
+  const travellerText = travellerStart >= 0 ? text.slice(travellerStart) : text;
+  let travellerMatch;
+  while ((travellerMatch = travellerPattern.exec(travellerText)) !== null) {
+    passengers.push({
+      name: travellerMatch[1].trim(),
+      gender: travellerMatch[2],
+      age: travellerMatch[3],
+      seat: travellerMatch[4]
+    });
+  }
+
+  if (!ticketId && !pnr && !passengers.length && !origin) return null;
+
+  return {
+    type: "Bus",
+    number: ticketId || pnr || orderNumber || "Not provided",
+    pnr: pnr || "Not provided",
+    date: dates.join(" → ") || "Date not provided",
+    time: times.length ? `${times[0]} → ${times.find((time, index) => index > 0) || "Arrival not provided"}` : "Time not provided",
+    origin: origin || "Origin not provided",
+    destination: destination || "Destination not provided",
+    passenger: passengers.map((passenger) => passenger.name).join(", ") || "Passenger not provided",
+    passengers,
+    seat: passengers.map((passenger) => passenger.seat).join(", ") || "Not assigned",
+    status: "Confirmed"
+  };
 }
 
 function parseKeyValueLines(lines) {
@@ -207,6 +272,7 @@ function normalizeTicket(input) {
     origin: String(first("origin", "from", "departure", "source") || ""),
     destination: String(first("destination", "to", "arrival", "terminal") || ""),
     passenger: String(first("passenger", "passengername", "name", "traveler") || "Passenger not provided"),
+    passengers: Array.isArray(record.passengers) ? record.passengers : [],
     seat: String(first("seat", "seatnumber", "berth") || "Not assigned"),
     status: String(first("status", "bookingstatus") || "Confirmed")
   };
@@ -267,7 +333,10 @@ function renderTickets() {
 
   const flights = tickets.filter((ticket) => ticket.type === "Flight").length;
   const buses = tickets.filter((ticket) => ticket.type === "Bus").length;
-  const passengers = new Set(tickets.map((ticket) => ticket.passenger).filter((name) => name !== "Passenger not provided")).size;
+  const passengers = tickets.reduce((count, ticket) => {
+    if (ticket.passengers?.length) return count + ticket.passengers.length;
+    return ticket.passenger !== "Passenger not provided" ? count + 1 : count;
+  }, 0);
 
   document.querySelector("#flight-count").textContent = String(flights);
   document.querySelector("#bus-count").textContent = String(buses);
@@ -287,6 +356,12 @@ function renderTickets() {
     const route = ticket.origin || ticket.destination
       ? `${ticket.origin || "Origin"} <span class="route-arrow">→</span> ${ticket.destination || "Destination"}`
       : "Route not provided";
+    const passengerDetails = ticket.passengers?.length
+      ? ticket.passengers.map((passenger) =>
+          `<div class="passenger-row"><strong>${escapeHtml(passenger.name)}</strong><span>${escapeHtml(passenger.gender)}, ${escapeHtml(passenger.age)} years · Seat ${escapeHtml(passenger.seat)}</span></div>`
+        ).join("")
+      : `<div><small>Passenger</small><strong>${escapeHtml(ticket.passenger)}</strong></div>
+         <div><small>Seat</small><strong>${escapeHtml(ticket.seat)}</strong></div>`;
     return `<article class="ticket-card">
       <div class="ticket-rail ${ticket.type.toLowerCase()}"></div>
       <div class="ticket-main">
@@ -300,8 +375,7 @@ function renderTickets() {
       <div class="ticket-details">
         <div><small>Date</small><strong>${escapeHtml(ticket.date)}</strong></div>
         <div><small>Time</small><strong>${escapeHtml(ticket.time)}</strong></div>
-        <div><small>Passenger</small><strong>${escapeHtml(ticket.passenger)}</strong></div>
-        <div><small>Seat</small><strong>${escapeHtml(ticket.seat)}</strong></div>
+        <div class="travellers"><small>Travellers</small>${passengerDetails}</div>
       </div>
     </article>`;
   }).join("");
