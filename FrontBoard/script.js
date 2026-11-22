@@ -179,48 +179,71 @@ function parseTextFeed(text) {
 }
 
 function parseBusTicketText(text) {
-  if (!/\b(?:bus booking|bus ticket|e-ticket)\b/i.test(text)) return null;
+  if (!/\b(?:bus booking|bus ticket|e-ticket|ticket id)\b/i.test(text)) return null;
 
   const ticketId = text.match(/Ticket\s*ID:\s*([A-Z0-9]+)/i)?.[1];
-  const pnr = text.match(/PNR:\s*([A-Z0-9]+)/i)?.[1];
+  const pnrMatch = text.match(/PNR\s*:?\s*([A-Z0-9]+)/i);
+  const pnr = pnrMatch?.[1];
   const orderNumber = text.match(/Order\s*#\s*([0-9-]+)/i)?.[1];
 
-  const routeMatch = text.match(/PNR:\s*[A-Z0-9]+\s+([A-Za-z][A-Za-z\s]+?)\s+([A-Za-z][A-Za-z\s]+?)\s+(?:[A-Z][A-Z\s]*LINES\b)/i);
-  let origin = routeMatch?.[1]?.trim() || "";
-  let destination = routeMatch?.[2]?.trim() || "";
+  const lines = text.split(/\r?\n| {2,}/).map((line) => line.trim()).filter(Boolean);
+  let origin = "";
+  let destination = "";
 
-  if (!origin || !destination) {
-    const routeBeforeOperator = text.match(/PNR:\s*[A-Z0-9]+\s+(.{2,80}?)\s+(?:[A-Z][A-Z\s]*LINES\b)/i)?.[1]?.trim();
-    if (routeBeforeOperator) {
-      const arrowParts = routeBeforeOperator.split(/\s+->\s+/);
-      if (arrowParts.length === 2) {
-        origin = arrowParts[0].trim();
-        destination = arrowParts[1].trim();
-      } else {
-        const knownRoute = routeBeforeOperator.match(/^(.+?)\s+(Velankanni|Chennai|Madurai|Coimbatore|Bangalore|Bengaluru|Hyderabad)$/i);
-        if (knownRoute) {
-          origin = knownRoute[1].trim();
-          destination = knownRoute[2].trim();
-        }
+  if (pnrMatch) {
+    const pnrIndex = lines.findIndex((line) => line.toUpperCase().includes(pnr));
+    if (pnrIndex >= 0) {
+      const routeLineCandidates = lines.slice(pnrIndex + 1).filter((line) =>
+        !/^(?:PNR|TICKET|ALAYA|NON A\/C|BOARDING|DROP|[A-Z]+ ROAD)/i.test(line)
+        && !/^(?:Point|Date|Time|Duration|Male|Female|Traveller)/i.test(line)
+      );
+      const cities = routeLineCandidates.slice(0, 4);
+      if (cities.length >= 2) {
+        origin = cities[0].replace(/^\d[\d:.]*\s*/, "").trim();
+        destination = cities[1].replace(/^\d[\d:.]*\s*/, "").trim();
       }
     }
   }
 
+  if (!origin || !destination) {
+    const routeMatch = text.match(/(?:PNR\s*:?\s*[A-Z0-9]+[\s\S]{0,180}?)([A-Z][A-Za-z\s.'-]{2,35}?)\s+(?:([A-Z][A-Za-z\s.'-]{2,35}?))\s+(?:[A-Z][A-Z\s]*(?:LINES|TRAVELS|BUS))/i);
+    origin = origin || routeMatch?.[1]?.trim() || "";
+    destination = destination || routeMatch?.[2]?.trim() || "";
+  }
+
   const times = [...text.matchAll(/(?:\b|[^\d])(\d{1,2}:\d{2}\s*(?:AM|PM))/gi)].map((match) => match[1].replace(/\s+/g, " ").toUpperCase());
   const dates = [...text.matchAll(/\b((?:Sun|Mon|Tue|Wed|Thu|Fri|Sat),\s*\d{1,2}\s+(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec))\b/gi)].map((match) => match[1]);
+  const boardingDate = dates[0] || "Date not provided";
+  const arrivalDate = dates[1] || "";
+  const dateDisplay = arrivalDate ? `${boardingDate} → ${arrivalDate}` : boardingDate;
 
   const passengers = [];
-  const travellerPattern = /([A-Za-z][A-Za-z.-]*(?:\s+[A-Za-z][A-Za-z.-]*)*?)\s+(Female|Male),\s*(\d+)\s*years?\s+([A-Z0-9]+)/gi;
   const travellerStart = text.search(/Traveller Details|Travellers\s+Gender/i);
   const travellerText = travellerStart >= 0 ? text.slice(travellerStart) : text;
-  let travellerMatch;
-  while ((travellerMatch = travellerPattern.exec(travellerText)) !== null) {
-    passengers.push({
-      name: travellerMatch[1].trim(),
-      gender: travellerMatch[2],
-      age: travellerMatch[3],
-      seat: travellerMatch[4]
-    });
+
+  const travellerLines = travellerText.split(/\r?\n| {2,}/).map((line) => line.trim()).filter(Boolean);
+  for (let index = 0; index < travellerLines.length - 2; index += 1) {
+    const genderMatch = travellerLines[index + 1].match(/^(Female|Male),\s*(\d+)\s*years?/i);
+    if (!genderMatch) continue;
+    const name = travellerLines[index].replace(/^(?:Travellers?|Gender.*|Seat.*)$/i, "").trim();
+    const seat = travellerLines[index + 2].match(/^([A-Z0-9]+)/)?.[1];
+    if (name && !/^(?:Traveller Details|Gender|Age|Seat)/i.test(name) && seat) {
+      passengers.push({ name, gender: genderMatch[1], age: genderMatch[2], seat });
+      index += 2;
+    }
+  }
+
+  if (!passengers.length) {
+    const travellerPattern = /([A-Z][A-Za-z.-]*(?:[ \t]+[A-Z][A-Za-z.-]*){0,3})\s+(Female|Male),\s*(\d+)\s*years?\s+([A-Z0-9]+)/gi;
+    let travellerMatch;
+    while ((travellerMatch = travellerPattern.exec(travellerText)) !== null) {
+      passengers.push({
+        name: travellerMatch[1].trim(),
+        gender: travellerMatch[2],
+        age: travellerMatch[3],
+        seat: travellerMatch[4]
+      });
+    }
   }
 
   if (!ticketId && !pnr && !passengers.length && !origin) return null;
@@ -229,7 +252,7 @@ function parseBusTicketText(text) {
     type: "Bus",
     number: ticketId || pnr || orderNumber || "Not provided",
     pnr: pnr || "Not provided",
-    date: dates.join(" → ") || "Date not provided",
+    date: dateDisplay,
     time: times.length ? `${times[0]} → ${times.find((time, index) => index > 0) || "Arrival not provided"}` : "Time not provided",
     origin: origin || "Origin not provided",
     destination: destination || "Destination not provided",
